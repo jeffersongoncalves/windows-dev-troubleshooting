@@ -1,0 +1,28 @@
+# Never commit a security product configuration export - it contains the full
+# exclusion list, network rules and local paths of the machine it came from.
+*.cfg
+*.dat
+kav*
+defender-export*
+
+# Health reports contain machine names, usernames and installed software
+*health-report*.json
+*report*.txt
+
+# Local scratch
+tmp/
+scratch/
+*.log
+
+# OS noise
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Banner source stays local - only the rendered PNG is published
+*.svg

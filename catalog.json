@@ -1,0 +1,150 @@
+{
+  "$schema": "./catalog.schema.json",
+  "version": 1,
+  "description": "Machine-readable index of diagnoses. Match on signal+match, never on user wording alone.",
+  "report": "scripts/Get-WindowsHealthReport.ps1",
+  "entries": [
+    {
+      "id": "windows-update-source-modified",
+      "title": "Windows Update fails with 0x800f0922 / CBS_E_SOURCE_MODIFIED",
+      "doc": "docs/windows-update-0x800f0922-cbs-source-modified.md",
+      "symptoms": [
+        "computer will not turn on",
+        "stuck on Working on updates",
+        "reboots several times at startup",
+        "update installs then rolls back",
+        "boot takes much longer than usual"
+      ],
+      "signal": "windowsUpdate",
+      "match": {
+        "all": [
+          "windowsUpdate.setupFailures > 0",
+          "crashes.kernelPower41 == 0",
+          "crashes.bugCheck1001 == 0"
+        ],
+        "strongEvidence": [
+          "cbs.sourceModifiedHits > 0",
+          "windowsUpdate.trustedInstallerReboots >= 2"
+        ]
+      },
+      "distinguishFrom": [
+        "Real boot failure: would show Kernel-Power 41 or BugCheck 1001.",
+        "Disk full on System Reserved: check volumes.systemReservedFreeMB."
+      ],
+      "risk": "medium",
+      "reversible": "SoftwareDistribution and catroot2 are renamed to .old, not deleted. Restore by stopping the services and renaming back.",
+      "requires_confirmation": true,
+      "durationMinutes": [15, 60],
+      "notes": "DISM and SFC saturate disk I/O. Warn the user the machine will feel frozen while they run."
+    },
+    {
+      "id": "powershell-window-at-logon",
+      "title": "A PowerShell window opens at every logon",
+      "doc": "docs/powershell-window-at-logon.md",
+      "symptoms": [
+        "a terminal opens when I log in",
+        "console window flashes at startup",
+        "black window appears then closes",
+        "my monitoring script keeps dying"
+      ],
+      "signal": "logonShellTasks",
+      "match": {
+        "all": [
+          "logonShellTasks.count > 0"
+        ],
+        "strongEvidence": [
+          "logonShellTasks[].logonType == 'Interactive'",
+          "logonShellTasks[].lastTaskResult == 3221225786"
+        ]
+      },
+      "distinguishFrom": [
+        "A terminal app (Windows Terminal, Warp, Hyper) started from a registry Run key: check runKeys in the report; the fix there is removing the Run entry."
+      ],
+      "risk": "low",
+      "reversible": "Set the task principal back to LogonType Interactive.",
+      "requires_confirmation": false,
+      "durationMinutes": [1, 2],
+      "notes": "lastTaskResult 3221225786 is 0xC000013A (STATUS_CONTROL_C_EXIT) - the user closed the window and killed the script. S4U fixes both the window and the silent death."
+    },
+    {
+      "id": "whea-pcie-correctable",
+      "title": "WHEA-Logger 17 PCIe correctable errors behind random freezes",
+      "doc": "docs/whea-logger-17-pcie-correctable-errors.md",
+      "symptoms": [
+        "system freezes for a few seconds",
+        "random stutters with no blue screen",
+        "mouse and audio stall then recover"
+      ],
+      "signal": "whea",
+      "match": {
+        "all": [
+          "whea.id17 > 20"
+        ],
+        "strongEvidence": [
+          "whea.topDevice != null",
+          "whea.maxPerDay > 10"
+        ]
+      },
+      "distinguishFrom": [
+        "I/O saturation from a running repair or antivirus scan: check processes.tiWorkerCpuSeconds and processes.avCpuTop.",
+        "Storage problems: check storage.errorEvents and storage.healthStatus."
+      ],
+      "risk": "low",
+      "reversible": "Diagnosis only. Driver, firmware and ASPM changes are performed by the human.",
+      "requires_confirmation": true,
+      "durationMinutes": [5, 10],
+      "notes": "Correlate WHEA timestamps against the reported freeze time. A high count with no timestamp match is a separate chronic issue, not the cause of the acute event. Report it as such."
+    },
+    {
+      "id": "av-exclusion-wrong-scope",
+      "title": "Antivirus exclusion applies to the wrong protection components",
+      "doc": "docs/antivirus-exclusions-that-do-nothing.md",
+      "symptoms": [
+        "I already added the exclusion and nothing changed",
+        "builds still slow after excluding the folder",
+        "update still fails with antivirus exclusion in place"
+      ],
+      "signal": "antivirus",
+      "match": {
+        "all": [
+          "antivirus.thirdPartyPresent == true"
+        ],
+        "strongEvidence": [
+          "antivirus.exclusionsWithRestrictedScope > 0"
+        ]
+      },
+      "distinguishFrom": [
+        "Trusted-application entry pointing at a stale path after a tool update: check antivirus.trustedAppsMissingOnDisk."
+      ],
+      "risk": "medium",
+      "reversible": "Keep the pre-change configuration export; import restores it.",
+      "requires_confirmation": true,
+      "durationMinutes": [5, 15],
+      "notes": "An exclusion scoped only to behaviour detection leaves the real-time file scanner active. Parse the stored component list; do not trust the UI summary."
+    },
+    {
+      "id": "av-trusted-app-stale-path",
+      "title": "Trusted-application rule points at a path that no longer exists",
+      "doc": "docs/antivirus-exclusions-that-do-nothing.md",
+      "symptoms": [
+        "tool worked before the update and now gets blocked",
+        "local .test domains stopped resolving",
+        "app cannot write to the hosts file"
+      ],
+      "signal": "antivirus",
+      "match": {
+        "all": [
+          "antivirus.trustedAppsMissingOnDisk > 0"
+        ]
+      },
+      "distinguishFrom": [
+        "Genuine permission problem: check whether the hosts file is read-only and whether the process elevates."
+      ],
+      "risk": "low",
+      "reversible": "Remove the added entry, or restore the configuration backup.",
+      "requires_confirmation": true,
+      "durationMinutes": [5, 10],
+      "notes": "Trusted-app rules match on exact executable path. When a tool relocates its binary the rule silently stops matching. Register the elevation helper too, not only the main binary."
+    }
+  ]
+}
