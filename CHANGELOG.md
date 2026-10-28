@@ -20,4 +20,8 @@ All notable changes to this project will be documented in this file.
 
 - Initial release of Windows troubleshooting field notes
 
+### Other
+
+- Auto-assign issues and pull requests
+
 
